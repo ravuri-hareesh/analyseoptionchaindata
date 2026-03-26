@@ -5,6 +5,7 @@ __pycache__/
 
 # Generated plot outputs
 support_resistance*.png
+overlay_*.png
 
 # Virtual environments
 .venv/
