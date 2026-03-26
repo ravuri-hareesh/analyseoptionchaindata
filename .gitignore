@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated plot outputs
+support_resistance*.png
+
+# Virtual environments
+.venv/
+venv/
+
