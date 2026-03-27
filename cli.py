@@ -15,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     p.add_argument("--input", "-i", required=True, help="Path to option-chain file (.csv or .xlsx).")
-    p.add_argument("--output", "-o", default="support_resistance.png", help="Output image path (png).")
+    p.add_argument("--output", "-o", default="output/support_resistance.png", help="Output image path (png).")
     p.add_argument("--show", action="store_true", help="Show the plot window.")
 
     # Column overrides (optional)

@@ -17,7 +17,7 @@ python -m pip install -r requirements.txt
 ## Run with the included sample
 
 ```powershell
-python -m nse_option_chain_graph --input "C:\Users\ravur\OneDrive\Documents\nse_option_chain_graph\sample\option_chain_sample.csv" --output "support_resistance.png"
+python -m nse_option_chain_graph --input "C:\Users\ravur\OneDrive\Documents\nse_option_chain_graph\file_inputs\option_chain_sample.csv" --output "output\support_resistance.png"
 ```
 
 It will print the max support/resistance strikes and create `support_resistance.png` in the project folder.
@@ -25,7 +25,7 @@ It will print the max support/resistance strikes and create `support_resistance.
 ## Run with your own NSE file
 
 ```powershell
-python -m nse_option_chain_graph --input "path\to\option_chain.csv" --output "support_resistance.png"
+python -m nse_option_chain_graph --input "file_inputs\option_chain.csv" --output "output\support_resistance.png"
 ```
 
 ## Run with your `Downloads/option_chain_data.csv`
@@ -39,7 +39,7 @@ python -m nse_option_chain_graph --input "C:\Users\ravur\Downloads\option_chain_
 If your column names don't match common NSE exports, pass explicit columns:
 
 ```powershell
-python -m nse_option_chain_graph --input "path\to\option_chain.csv" --output "support_resistance.png" `
+python -m nse_option_chain_graph --input "file_inputs\option_chain.csv" --output "output\support_resistance.png" `
   --strike-col "Strike Price" --ce-oi-col "CE OI" --pe-oi-col "PE OI"
 ```
 
