@@ -99,3 +99,41 @@ def compute_support_resistance(
         "smooth_window": smooth_window,
     }
 
+
+def compute_pcr(
+    df: pd.DataFrame,
+    strike_col: str,
+    ce_oi_col: str,
+    pe_oi_col: str,
+    min_strike: Optional[float] = None,
+    max_strike: Optional[float] = None,
+) -> Dict[str, float]:
+    """
+    Compute Put-Call Ratio (PCR).
+    Returns a dict with 'overall_pcr' and 'ranged_pcr' (if range provided).
+    PCR = Sum(PE_OI) / Sum(CE_OI)
+    """
+    data = df[[strike_col, ce_oi_col, pe_oi_col]].copy()
+    data = data.rename(columns={strike_col: "strike", ce_oi_col: "ce_oi", pe_oi_col: "pe_oi"})
+    data["ce_oi"] = pd.to_numeric(data["ce_oi"], errors="coerce").fillna(0)
+    data["pe_oi"] = pd.to_numeric(data["pe_oi"], errors="coerce").fillna(0)
+
+    total_ce = data["ce_oi"].sum()
+    total_pe = data["pe_oi"].sum()
+    overall_pcr = float(total_pe / total_ce) if total_ce > 0 else 0.0
+
+    result = {"overall_pcr": overall_pcr}
+
+    if min_strike is not None or max_strike is not None:
+        mask = pd.Series(True, index=data.index)
+        if min_strike is not None:
+            mask = mask & (data["strike"] >= min_strike)
+        if max_strike is not None:
+            mask = mask & (data["strike"] <= max_strike)
+        
+        ranged_data = data[mask]
+        ranged_ce = ranged_data["ce_oi"].sum()
+        ranged_pe = ranged_data["pe_oi"].sum()
+        result["ranged_pcr"] = float(ranged_pe / ranged_ce) if ranged_ce > 0 else 0.0
+
+    return result
