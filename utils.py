@@ -33,78 +33,60 @@ def guess_columns(
 ) -> Tuple[str, str, str]:
     """
     Guess the (strike, call OI, put OI) column names from common NSE exports.
-
-    If you know the exact column names, prefer passing them via CLI flags.
     """
     cols = list(df.columns)
     if not cols:
         raise ValueError("Input file has no columns.")
 
-    # Special-case: some NSE option-chain CSV exports come out with flat columns like:
-    #   STRIKE, OI (Calls), OI.1 (Puts)
-    if strike_col is None and ce_oi_col is None and pe_oi_col is None:
-        if "STRIKE" in df.columns and "OI" in df.columns and "OI.1" in df.columns:
-            return "STRIKE", "OI", "OI.1"
-
-    if strike_col is not None:
-        if strike_col not in df.columns:
-            raise ValueError(f"strike column not found: {strike_col!r}")
-    if ce_oi_col is not None:
-        if ce_oi_col not in df.columns:
-            raise ValueError(f"CE OI column not found: {ce_oi_col!r}")
-    if pe_oi_col is not None:
-        if pe_oi_col not in df.columns:
-            raise ValueError(f"PE OI column not found: {pe_oi_col!r}")
-
-    # Strike
+    # Convert columns to standardized forms for matching
+    cols_norm = [_norm_col(c) for c in df.columns]
+    
+    # 1. GUESS STRIKE
     if strike_col is None:
-        strike_col = _pick_col(
-            df,
-            lambda c: "strike" in _norm_col(c),
-        )
+        # Priority: Exact match, then fuzzy
+        for kw in ["strikeprice", "strike"]:
+            if kw in cols_norm:
+                strike_col = df.columns[cols_norm.index(kw)]
+                break
+        if strike_col is None:
+            strike_col = _pick_col(df, lambda c: "strike" in _norm_col(c))
 
-    # CE/PE OI
+    # 2. GUESS CE / CALL OI
     if ce_oi_col is None:
-        # Most common: CE OI / Call OI
-        ce_oi_col = _pick_col(
-            df,
-            lambda c: ("ce" in _norm_col(c) and "oi" in _norm_col(c))
-            or ("call" in _norm_col(c) and "oi" in _norm_col(c)),
-        )
+        # Priority: Normalized match (CE OI, CALL OPEN INTEREST)
+        ce_oi_col = _pick_col(df, lambda c: ("ce" in _norm_col(c) or "call" in _norm_col(c)) and "oi" in _norm_col(c))
+        # Fallback: Just "OI" if it appears before PE (NSE Standard)
+        if ce_oi_col is None and "oi" in cols_norm:
+            ce_oi_col = df.columns[cols_norm.index("oi")]
 
+    # 3. GUESS PE / PUT OI
     if pe_oi_col is None:
-        pe_oi_col = _pick_col(
-            df,
-            lambda c: ("pe" in _norm_col(c) and "oi" in _norm_col(c))
-            or ("put" in _norm_col(c) and "oi" in _norm_col(c)),
-        )
+        # Priority 1: "OI.1" (Pandas rename of the second 'OI' column in most NSE exports)
+        if "OI.1" in df.columns:
+            pe_oi_col = "OI.1"
+        # Priority 2: Fuzzy match
+        if pe_oi_col is None:
+            pe_oi_col = _pick_col(df, lambda c: ("pe" in _norm_col(c) or "put" in _norm_col(c)) and "oi" in _norm_col(c) and c != ce_oi_col)
+        # Priority 3: Second "OI" if first was CE
+        if pe_oi_col is None and cols_norm.count("oi") > 1:
+            indices = [i for i, x in enumerate(cols_norm) if x == "oi"]
+            pe_oi_col = df.columns[indices[-1]]
 
-    # Last resort: explicit "Open Interest" without CE/PE then split by "Call"/"Put"
+    # 4. LAST RESORT FUZZY ALL
     if ce_oi_col is None:
-        ce_oi_col = _pick_col(
-            df,
-            lambda c: "openinterest" in _norm_col(c) and ("call" in _norm_col(c) or "ce" in _norm_col(c)),
-        )
+        ce_oi_col = _pick_col(df, lambda c: "openinterest" in _norm_col(c))
     if pe_oi_col is None:
-        pe_oi_col = _pick_col(
-            df,
-            lambda c: "openinterest" in _norm_col(c) and ("put" in _norm_col(c) or "pe" in _norm_col(c)),
-        )
+        pe_oi_col = _pick_col(df, lambda c: "openinterest" in _norm_col(c) and c != ce_oi_col)
 
     missing = []
-    if strike_col is None:
-        missing.append("strike")
-    if ce_oi_col is None:
-        missing.append("ce_oi")
-    if pe_oi_col is None:
-        missing.append("pe_oi")
+    if strike_col is None: missing.append("strike")
+    if ce_oi_col is None: missing.append("ce_oi")
+    if pe_oi_col is None: missing.append("pe_oi")
 
     if missing:
         raise ValueError(
-            "Could not guess required columns: "
-            + ", ".join(missing)
-            + ".\n"
-            + "Tip: pass --strike-col, --ce-oi-col, --pe-oi-col with the exact names."
+            f"Could not guess required columns: {', '.join(missing)}.\n"
+            f"Available columns: {cols[:10]}..."
         )
 
     return strike_col, ce_oi_col, pe_oi_col

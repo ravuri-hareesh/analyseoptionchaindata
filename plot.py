@@ -5,7 +5,7 @@ from typing import Optional
 
 import matplotlib.pyplot as plt
 
-from .analysis import Level
+from analysis import Level
 
 
 def plot_support_resistance(
