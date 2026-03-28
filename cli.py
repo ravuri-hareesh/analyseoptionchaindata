@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from .analysis import compute_support_resistance
-from .io import load_option_chain
+from .data_io import load_option_chain
 from .plot import plot_support_resistance
 
 

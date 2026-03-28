@@ -1,55 +1,39 @@
-# NSE Option Chain Support/Resistance Graph
+# NSE Pro Terminal: Advanced Option Chain Suite 📈
 
-This small Python project reads an NSE option-chain table (typically CSV or Excel), extracts `Strike`, `CE OI`, and `PE OI`, then plots:
-- Put OI peaks (support candidates) in **green**
-- Call OI peaks (resistance candidates) in **red**
-- The **maximum support** (max PE OI) and **maximum resistance** (max CE OI) are highlighted.
+A professional-grade, automated dashboard for real-time NSE Option Chain analysis. This tool transforms raw NSE data into actionable Support/Resistance barriers and sentiment indicators using high-fidelity Plotly visualizations and a TradingView-inspired dark theme.
 
-## Requirements
+## 🚀 Quickstart
 
-Install dependencies:
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```powershell
-cd "C:\Users\ravur\OneDrive\Documents\nse_option_chain_graph"
-python -m pip install -r requirements.txt
-```
+2. **Launch the Dashboard**:
+   ```bash
+   python -m streamlit run app.py
+   ```
+   *The background scraper starts automatically on launch!*
 
-## Run with the included sample
+## ✨ Key Features
 
-```powershell
-python -m nse_option_chain_graph --input "C:\Users\ravur\OneDrive\Documents\nse_option_chain_graph\file_inputs\option_chain_sample.csv" --output "output\support_resistance.png"
-```
+- **Integrated Live Scraper**: Automatically fetches NIFTY data every 5 minutes during market hours (9:00 AM - 3:30 PM, Mon-Fri).
+- **Near-The-Money (NTM) PCR**: A focused sentiment indicator targeting ±2% of the Spot price for precision signals.
+- **Dynamic S/R Barriers**: Real-time "Step Chart" tracking of Major and Immediate Support/Resistance levels.
+- **Multi-Day Archive**: Seamlessly "Time Travel" to view historical days' trends via the sidebar date selector.
+- **Scraper Health Monitor**: Real-time pulsing status badge (🟢) shows live connectivity and data freshless.
 
-It will print the max support/resistance strikes and create `support_resistance.png` in the project folder.
+## 📂 Architecture
 
-## Run with your own NSE file
+- `app.py`: Main Streamlit UI and background thread manager.
+- `nse_scraper.py`: Background worker for session-based data fetching.
+- `analysis.py`: Core logic for PCR and S/R heuristics.
+- `io_manager.py`: Handles date-based archiving in `input_file/` and `output/`.
+- `style.css`: Professional modern dark theme with Glassmorphism.
 
-```powershell
-python -m nse_option_chain_graph --input "file_inputs\option_chain.csv" --output "output\support_resistance.png"
-```
+## 📖 Usage Guidelines
 
-## Run with your `Downloads/option_chain_data.csv`
+For a detailed breakdown of how to interpret the charts and manage the data, please refer to the [USER_GUIDE.md](./USER_GUIDE.md).
 
-This is a common NSE export that comes with flat headers like `STRIKE`, `OI`, and `OI.1`.
-
-```powershell
-python -m nse_option_chain_graph --input "C:\Users\ravur\Downloads\option_chain_data.csv" --output "support_resistance.png"
-```
-
-If your column names don't match common NSE exports, pass explicit columns:
-
-```powershell
-python -m nse_option_chain_graph --input "file_inputs\option_chain.csv" --output "output\support_resistance.png" `
-  --strike-col "Strike Price" --ce-oi-col "CE OI" --pe-oi-col "PE OI"
-```
-
-## How support/resistance is computed
-
-- **Support** = strike with the highest **PE OI**
-- **Resistance** = strike with the highest **CE OI**
-- Additionally, the tool highlights the **top N** PE/CE OI strikes (default `N=3`).
-
-## Notes / next step
-
-If you tell me what your NSE file columns look like (paste the header row), I can tune the column guessing rules and (if you want) the exact formula used for support/resistance.
-
+---
+*Optimized for professional traders and data-driven market analysis.*

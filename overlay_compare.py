@@ -5,9 +5,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from nse_option_chain_graph.analysis import compute_support_resistance
-from nse_option_chain_graph.io import load_option_chain
-from nse_option_chain_graph.analysis import Level
+from analysis import compute_support_resistance, Level
+from data_io import load_option_chain
 
 
 def _label_from_path(p: str) -> str:

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from nse_option_chain_graph.analysis import compute_pcr
-from nse_option_chain_graph.io import load_option_chain
+from analysis import compute_pcr
+from data_io import load_option_chain
 
 
 def main() -> int:
