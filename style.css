@@ -1,0 +1,135 @@
+/* --- PROFESSIONAL TRADING TERMINAL STYLES --- */
+
+/* Root Overrides */
+:root {
+    --bg-main: #0e1117;
+    --bg-secondary: #161b22;
+    --text-primary: #f0f6fc;
+    --accent-blue: #2962ff;
+    --accent-green: #008f51;
+    --accent-red: #da3633;
+    --border-color: #30363d;
+}
+
+/* Base Styles */
+.stApp {
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Hide Streamlit Header & Footer */
+header {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* Sidebar Overrun */
+section[data-testid="stSidebar"] {
+    background-color: var(--bg-secondary) !important;
+    border-right: 1px solid var(--border-color);
+}
+
+/* Metric Card Customization */
+div[data-testid="stMetric"] {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(41, 98, 255, 0.15);
+    border-color: var(--accent-blue);
+}
+
+/* Metric Labels and Values */
+div[data-testid="stMetricLabel"] {
+    color: #8b949e !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+div[data-testid="stMetricValue"] {
+    color: var(--text-primary) !important;
+    font-size: 1.8rem !important;
+    font-weight: 700 !important;
+}
+
+/* Custom Status Pill / Badge */
+.status-pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.status-active {
+    background-color: rgba(0, 212, 106, 0.15);
+    color: #00d46a;
+}
+
+.status-pulse {
+    width: 8px;
+    height: 8px;
+    background-color: #00d46a;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+/* Tab Styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 12px;
+    background-color: transparent;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 45px;
+    background-color: var(--bg-secondary) !important;
+    border-radius: 8px 8px 0 0 !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 10px 20px;
+    color: #8b949e !important;
+    transition: all 0.2s;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: var(--bg-main) !important;
+    color: var(--accent-blue) !important;
+    border-bottom: 2px solid var(--accent-blue) !important;
+}
+
+/* Buttons */
+.stButton>button {
+    width: 100%;
+    background-color: var(--accent-blue) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    font-weight: 600 !important;
+    transition: filter 0.2s !important;
+}
+
+.stButton>button:hover {
+    filter: brightness(1.1);
+}
+
+/* Typography Enhancements */
+h1, h2, h3 {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.5px;
+}
