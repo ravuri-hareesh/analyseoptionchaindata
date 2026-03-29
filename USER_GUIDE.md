@@ -1,4 +1,4 @@
-# NSE Pro Terminal: User & Analysis Guide 📖
+# OptEazy: User & Analysis Guide 📖
 
 This guide explains how to interpret the charts and manage the automated data feed for your Option Chain dashboard.
 

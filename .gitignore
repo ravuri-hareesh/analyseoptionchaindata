@@ -1,14 +1,31 @@
+# OptEazy Data & Security
+users.db
+input_file/
+output/
+test_auth.py
+
+# Python Environment
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Generated plot outputs
-support_resistance*.png
-overlay_*.png
-pcr_trend*.png
-
-# Virtual environments
-.venv/
+.Python
+env/
 venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
 
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

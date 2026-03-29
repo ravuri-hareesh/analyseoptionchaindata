@@ -1,4 +1,4 @@
-# NSE Pro Terminal: Advanced Option Chain Suite 📈
+# OptEazy: Advanced Option Chain Suite 📈
 
 A professional-grade, automated dashboard for real-time NSE Option Chain analysis. This tool transforms raw NSE data into actionable Support/Resistance barriers and sentiment indicators using high-fidelity Plotly visualizations and a TradingView-inspired dark theme.
 
