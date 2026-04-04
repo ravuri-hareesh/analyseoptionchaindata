@@ -184,7 +184,11 @@ class OptEazyDB:
                 WHERE expiry = %s 
                 ORDER BY timestamp ASC
             """
-            df = pd.read_sql(query, self._mysql_conn, params=(expiry,))
+            cursor = self._mysql_conn.cursor(dictionary=True)
+            cursor.execute(query, (expiry,))
+            rows = cursor.fetchall()
+            df = pd.DataFrame(rows)
+            cursor.close()
             return df
         except Exception as e:
             logger.error(f"Failed to query evolution data: {e}")

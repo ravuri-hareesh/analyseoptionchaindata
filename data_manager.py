@@ -66,41 +66,63 @@ def get_current_date_str() -> str:
 def extract_timestamp_from_filename(file_path: Union[str, Path]) -> datetime:
     """
     Robustly extracts HHMM from filenames like '0915.csv' or 'sv- 2026-04-02T131854.685.csv'.
-    Skips patterns that look like years (2024-2029) or full dates.
+    Skips patterns that look like years (2024-2030) or full dates.
+    Falls back to file modification time if no valid HHMM is found.
     """
     stem = Path(file_path).stem
     
     # 1. Look for ISO-style 'T' separator: T131854
     iso_match = re.search(r'T(\d{2})(\d{2})', stem)
     if iso_match:
-        return datetime.strptime(f"{iso_match.group(1)}{iso_match.group(2)}", "%H%M")
+        try:
+            hh, mm = int(iso_match.group(1)), int(iso_match.group(2))
+            if 0 <= hh < 24 and 0 <= mm < 60:
+                return datetime.strptime(f"{iso_match.group(1)}{iso_match.group(2)}", "%H%M")
+        except: pass
         
-    # 2. Look for explicit HHMM or HH:MM pattern (skipping 202X)
-    # Pattern: finds 4 digits that DON'T start with '202' (simplistic but effective for this shelf-life)
-    # or look for 4 digits that are NOT the year part of any date.
-    
-    # More robust: remove all YYYY-MM-DD or DD-MM-YYYY patterns first
+    # 2. Look for clear HHMM patterns (skipping years)
+    # We remove all YYYY-MM-DD or DD-MM-YYYY patterns first to avoid picking up days as times
     clean_stem = re.sub(r'\d{4}-\d{2}-\d{2}', ' ', stem)
     clean_stem = re.sub(r'\d{2}-\d{2}-\d{4}', ' ', clean_stem)
+    clean_stem = re.sub(r'\d{2}-[A-Za-z]{3}-\d{4}', ' ', clean_stem) # 28-Apr-2026
     
-    # Now find the first 4-digit sequence
+    # Find all 4-digit sequences
     digits = re.findall(r'\d{4}', clean_stem)
-    if digits:
-         # Still check if it might be a remaining year part
-         for d in digits:
-             if not (2020 <= int(d) <= 2030):
-                 return datetime.strptime(d, "%H%M")
-                 
-    # 3. Fallback: find any 4 digits
+    for d in digits:
+        val = int(d)
+        # Skip if it's a year-like number
+        if 2020 <= val <= 2030:
+            continue
+        try:
+            hh, mm = int(d[:2]), int(d[2:])
+            if 0 <= hh < 24 and 0 <= mm < 60:
+                return datetime.strptime(d, "%H%M")
+        except: pass
+                
+    # 3. Final Fallback Catch-all: find any 4+ digits
     all_digits = re.sub(r'[^\d]', '', stem)
     if len(all_digits) >= 4:
+        # Check starting digits or standard sync prefix
         # If it's something like 202604021318, we want the 1318 part (index 8:12)
+        candidates = []
         if all_digits.startswith("202") and len(all_digits) >= 12:
-            return datetime.strptime(all_digits[8:12], "%H%M")
-        return datetime.strptime(all_digits[:4], "%H%M")
+            candidates.append(all_digits[8:12])
+        candidates.append(all_digits[:4])
         
-    # 4. Final Fallback: use file modification time
-    return datetime.fromtimestamp(Path(file_path).stat().st_mtime)
+        for cand in candidates:
+            try:
+                hh, mm = int(cand[:2]), int(cand[2:])
+                # STRICT VALIDATION: If hh >= 24 or mm >= 60, it's NOT a time
+                if 0 <= hh < 24 and 0 <= mm < 60:
+                    # Use strptime but wrap in try to catch "unconverted data remains"
+                    return datetime.strptime(cand, "%H%M")
+            except: continue
+        
+    # 4. Total Fallback: use file modification time
+    try:
+        return datetime.fromtimestamp(Path(file_path).stat().st_mtime)
+    except:
+        return datetime.now() # Absolute last resort
 
 def _safe_merge_dirs(src: Path, dst: Path):
     """Recursively moves and merges directories and files."""
@@ -402,6 +424,7 @@ def get_validated_spot(df: pd.DataFrame, file_path: Path, allow_api: bool = True
     s_max = strikes.max() if not strikes.empty else 999999
     
     spot = 0
+    api_data = None
     
     # Logic 1: API-First (with Retries)
     if allow_api:
@@ -410,18 +433,23 @@ def get_validated_spot(df: pd.DataFrame, file_path: Path, allow_api: bool = True
             try:
                 # nse_get_index_quote is used as per user requirement for NIFTY 50 stability
                 data = nse_get_index_quote("NIFTY 50")
-                raw_val = data.get('last') or data.get('lastPrice') or data.get('underlyingValue')
-                if raw_val:
-                    # Sanitize (remove commas)
-                    clean_val = float(str(raw_val).replace(",", ""))
-                    
-                    # VALIDATION: Spot has to be within the strike prices
-                    if s_min <= clean_val <= s_max:
+                if isinstance(data, dict):
+                    raw_val = data.get('last') or data.get('lastPrice') or data.get('underlyingValue')
+                    if raw_val:
+                        # Sanitize (remove commas)
+                        clean_val = float(str(raw_val).replace(",", ""))
+                        
+                        # VALIDATION: Soft validation against strike boundaries
+                        # If it's outside, we still accept it (API is truth) but log a warning.
+                        if not (s_min <= clean_val <= s_max):
+                             logger.warning(f"⚠️ API Spot {clean_val} is outside strike range ({s_min}-{s_max}). Option chain might be incomplete.")
+                        
                         spot = clean_val
+                        api_data = data # Store for metadata saving
                         logger.info(f"API Spot Accepted: {spot}")
                         break
-                    else:
-                        logger.warning(f"API Spot {clean_val} out of range ({s_min}-{s_max}). Attempt {attempt}/3")
+                else:
+                    logger.warning(f"API Attempt {attempt} returned non-dict: {type(data)}")
             except Exception as e:
                 logger.warning(f"API Attempt {attempt} failed: {e}")
             
@@ -449,7 +477,13 @@ def get_validated_spot(df: pd.DataFrame, file_path: Path, allow_api: bool = True
     # Persistent Storage: Update sidecar if found
     if spot > 0:
         meta = sidecar or {}
+        # Ensure 'spot' remains the primary mandatory field
         meta["spot"] = spot
+        
+        # If we have API data, merge it into the metadata
+        if isinstance(api_data, dict):
+            meta.update(api_data)
+            
         save_sidecar_metadata(file_path, meta)
 
     return spot

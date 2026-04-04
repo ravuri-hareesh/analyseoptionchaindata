@@ -8,10 +8,12 @@ def get_nifty_spot():
         data = nse_get_index_quote("NIFTY 50")
         
         if isinstance(data, dict):
+            print(f"SUCCESS: Captured {len(data)} data points from NSE.")
             print(f"Debug: Found keys: {list(data.keys())}")
             spot = data.get('last') or data.get('lastPrice') or data.get('underlyingValue')
             if spot:
                 print(f"SPOT_RESULT: {spot}")
+                print("Note: This full dictionary is now being persisted to .meta.json in data_manager.py")
             else:
                 print(f"FAILED: Could not find price in: {json.dumps(data)[:300]}")
         else:
