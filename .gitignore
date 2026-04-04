@@ -1,20 +1,15 @@
-# OptEazy Data & Security
-users.db
-input_file/
-output/
-test_auth.py
+# OptEazy Minimal Ignore 
+# (Only ignoring runtime/temp files)
 
 # Python Environment
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
 env/
 venv/
 .venv/
 pip-log.txt
-pip-delete-this-directory.txt
 .tox/
 .coverage
 .cache
@@ -29,3 +24,8 @@ coverage.xml
 *.swp
 *.swo
 .DS_Store
+
+# Runtime/Lock files
+*.lock
+WiredTiger.lock
+mongod.lock
