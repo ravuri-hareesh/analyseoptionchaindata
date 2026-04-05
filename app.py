@@ -28,6 +28,9 @@ cookie_manager = stx.CookieManager()
 if 'auth_mode' not in st.session_state:
     st.session_state.auth_mode = "login"
 
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0
+
 st.set_page_config(
     page_title="OptEazy",
     page_icon="📈",
@@ -256,6 +259,7 @@ if st.session_state.get("authentication_status"):
     from db_connector import OptEazyDB
     db_manager = OptEazyDB()
     from plot import plot_support_resistance
+    from financial_data import run_indicator_service
 
     username = st.session_state.get("username")
     user_role = auth_manager.get_user_role(username)
@@ -271,7 +275,20 @@ if st.session_state.get("authentication_status"):
 
     # Start scraper if not already running (only for Admin or Editor)
     if user_role in ["admin", "content_editor"]:
-        scraper_thread = start_background_scraper()
+        if 'scraper_thread_init' not in st.session_state:
+            st.session_state.scraper_thread_init = start_background_scraper()
+        
+    # --- Background Financial Indicators Service ---
+    @st.cache_resource
+    def start_indicator_service():
+        """Starts the USD/INR and Oil price fetcher in the background."""
+        stop_event = threading.Event()
+        thread = threading.Thread(target=run_indicator_service, args=(db_manager, stop_event), daemon=True)
+        thread.start()
+        return thread, stop_event
+
+    if 'indicator_service' not in st.session_state:
+        st.session_state.indicator_service, st.session_state.indicator_stop = start_indicator_service()
 
     # --- Sidebar Layout ---
     with st.sidebar:
@@ -297,11 +314,28 @@ if st.session_state.get("authentication_status"):
             if st.button("🚪 Logout", key="manual_logout", type="primary", width="stretch"):
                 st.session_state["authentication_status"] = False
                 st.session_state["username"] = None
-                st.session_state["name"] = None
-                # Purge persistence cookie and clear URL
-                cookie_manager.delete("opteazy_user", key="del_user_cookie")
-                st.query_params.clear()
-                st.rerun()
+               # 4. Manual Operations (Admin Only)
+        if user_role in ["admin", "content_editor"]:
+            st.markdown("---")
+            st.markdown(f'<p style="font-size:0.75rem; color:#8b949e; margin-bottom:5px;">ADMIN TOOLS</p>', unsafe_allow_html=True)
+            if st.button("🚀 Force Pulse Sync", use_container_width=True, help="Trigger manual NSE Fetch & DB Update"):
+                with st.spinner("Pulsing NSE..."):
+                    success, msg, target = fetch_and_save("NIFTY")
+                    if success:
+                        st.success(f"Sync Success: {msg}")
+                        st.info(f"Target Expiry: {target}")
+                        st.rerun()
+                    else:
+                        st.error(f"Sync Failed: {msg}")
+
+        # 5. Session Control
+        st.markdown("---")
+        logout = st.button("Logout", use_container_width=True)
+        if logout:
+            cookie_manager.delete("opteazy_user")
+            st.session_state.clear()
+            st.query_params.clear()
+            st.rerun()
                 
         st.markdown("---")
         
@@ -476,11 +510,15 @@ if st.session_state.get("authentication_status"):
         st.markdown("---")
         # Uploads (Admin/Editor Only)
         if user_role in ["admin", "content_editor"]:
-            uploaded_files = st.file_uploader("Import Archive Data (.csv, .xlsx)", type=["csv", "xlsx"], accept_multiple_files=True)
+            uploaded_files = st.file_uploader(
+                "Import Archive Data (.csv, .xlsx)", 
+                type=["csv", "xlsx"], 
+                accept_multiple_files=True,
+                key=f"uploader_{st.session_state.uploader_key}"
+            )
             if uploaded_files:
                 with st.spinner(f"Processing {len(uploaded_files)} files..."):
                     for uploaded_file in uploaded_files:
-                        # Use currently selected date context for the upload to ensure visibility
                         file_path = save_uploaded_file(uploaded_file, date_str=selected_date)
                         expiry_for_upload = discover_expiry_from_file(uploaded_file)
                         try:
@@ -494,6 +532,8 @@ if st.session_state.get("authentication_status"):
 
                     st.cache_data.clear() # Clear Streamlit cache
                     clear_evolution_cache() # Clear analysis analysis hot-cache
+                    # Increment key to reset uploader and rerun
+                    st.session_state.uploader_key += 1
                     st.rerun()
 
         if st.button("Instant Refresh"):
@@ -533,7 +573,15 @@ if st.session_state.get("authentication_status"):
                 fig_snapshot.add_trace(go.Bar(x=data["strike"], y=data["ce_oi"], name="Call OI (Resistance)", marker_color='#ff5252', opacity=0.8))
                 fig_snapshot.add_vline(x=res["max_support"].strike, line_width=3, line_dash="dash", line_color="#00c853", annotation_text="MAJOR SUPPORT")
                 fig_snapshot.add_vline(x=res["max_resistance"].strike, line_width=3, line_dash="dash", line_color="#ff5252", annotation_text="MAJOR RESISTANCE")
-                fig_snapshot.update_layout(template="plotly_dark", paper_bgcolor='#0e1117', plot_bgcolor='#0e1117', hovermode="x unified", barmode='group', height=850)
+                fig_snapshot.update_layout(
+                    template="plotly_dark", 
+                    paper_bgcolor='#0e1117', 
+                    plot_bgcolor='#0e1117', 
+                    hovermode="x unified", 
+                    barmode='group', 
+                    height=850,
+                    legend=dict(font=dict(color="white"))
+                )
                 st.plotly_chart(fig_snapshot, width="stretch")
                 
                 col1, col2 = st.columns(2)
@@ -543,6 +591,23 @@ if st.session_state.get("authentication_status"):
                 with col2:
                     st.markdown("#### 🏰 Resistance Walls")
                     st.dataframe(pd.DataFrame([{"Strike": l.strike, "OI": l.ce_oi} for l in res["top_resistance"]]), hide_index=True)
+
+                # --- NEW SECTION: Global Indicators (Currency & Oil) ---
+                st.markdown("---")
+                st.markdown("### 🌍 Global Indicators (Current)")
+                indicator_df = db_manager.query_market_indicators(selected_date)
+                
+                if not indicator_df.empty:
+                    latest_indic = indicator_df.iloc[-1]
+                    prev_indic = indicator_df.iloc[-2] if len(indicator_df) > 1 else latest_indic
+                    
+                    cur_col1, cur_col2, cur_col3 = st.columns(3)
+                    cur_col1.metric("USD/INR", f"₹{latest_indic['usd_inr']:.2f}", f"{latest_indic['usd_inr'] - prev_indic['usd_inr']:+.2f}")
+                    cur_col2.metric("WTI CRUDE", f"${latest_indic['wti_crude']:.2f}", f"{latest_indic['wti_crude'] - prev_indic['wti_crude']:+.2f}")
+                    cur_col3.metric("BRENT CRUDE", f"${latest_indic['brent_crude']:.2f}", f"{latest_indic['brent_crude'] - prev_indic['brent_crude']:+.2f}")
+                    st.caption(f"Last updated: {latest_indic['timestamp']}")
+                else:
+                    st.info("Global indicators data pending first fetch...")
 
     @st.cache_data(ttl=60)
     def get_cached_evolution(expiry: str, date_str: str, fingerprint: str):
@@ -716,7 +781,8 @@ if st.session_state.get("authentication_status"):
                 hovermode="x unified", 
                 dragmode='zoom',
                 hoverdistance=100,
-                spikedistance=1000
+                spikedistance=1000,
+                legend=dict(font=dict(color="white"))
             )
             # Force full numbers on Y-axis (no "k")
             fig_price.update_yaxes(
@@ -860,6 +926,52 @@ if st.session_state.get("authentication_status"):
             
             styled_df = audit_df[final_cols].style.format(fmt_dict).apply(lambda _: styles_df[final_cols], axis=None)
             st.dataframe(styled_df, width="stretch", hide_index=True)
+
+            # --- NEW SECTION: Rupee and Oil Movement (Below Audit Table) ---
+            st.markdown("---")
+            st.markdown("### 📊 Rupee and Oil Movement")
+            indic_evolution_df = db_manager.query_market_indicators(selected_date)
+            
+            if not indic_evolution_df.empty:
+                fig_indic = make_subplots(specs=[[{"secondary_y": True}]])
+                
+                # Dynamic USD/INR Color based on trend
+                usd_inr_color = "#ff5252" # Default Red
+                if len(indic_evolution_df) > 1:
+                    last_val = indic_evolution_df["usd_inr"].iloc[-1]
+                    prev_val = indic_evolution_df["usd_inr"].iloc[-2]
+                    if last_val < prev_val:
+                        usd_inr_color = "#00c853" # Green (Strengthening)
+                    elif last_val > prev_val:
+                        usd_inr_color = "#ff5252" # Red (Weakening)
+
+                # USD/INR (Left Axis)
+                fig_indic.add_trace(go.Scatter(x=indic_evolution_df["timestamp"], y=indic_evolution_df["usd_inr"],
+                    name="USD/INR", line=dict(color=usd_inr_color, width=4)), secondary_y=False)
+                
+                # Crude (Right Axis) - Orange Shades (Thick)
+                fig_indic.add_trace(go.Scatter(x=indic_evolution_df["timestamp"], y=indic_evolution_df["wti_crude"],
+                    name="WTI Crude", line=dict(color='#ffab40', width=5)), secondary_y=True) # Bright Orange
+                fig_indic.add_trace(go.Scatter(x=indic_evolution_df["timestamp"], y=indic_evolution_df["brent_crude"],
+                    name="Brent Crude", line=dict(color='#ff6d00', width=5)), secondary_y=True) # Dark Orange
+                
+                fig_indic.update_layout(
+                    template="plotly_dark", 
+                    paper_bgcolor='#0e1117', 
+                    plot_bgcolor='#0e1117', 
+                    height=450, 
+                    hovermode="x unified",
+                    legend=dict(font=dict(color="white")),
+                    xaxis=dict(title_font=dict(color="white"), tickfont=dict(color="white")),
+                    yaxis=dict(title_font=dict(color="white"), tickfont=dict(color="white")),
+                    yaxis2=dict(title_font=dict(color="white"), tickfont=dict(color="white"))
+                )
+                fig_indic.update_yaxes(title_text="USD/INR (₹)", secondary_y=False)
+                fig_indic.update_yaxes(title_text="Crude ($)", secondary_y=True)
+                
+                st.plotly_chart(fig_indic, width="stretch")
+            else:
+                st.info("Waiting for Rupee and Oil movement history...")
 
     # --- Global Footer (Disclaimer) ---
     st.markdown("---")
